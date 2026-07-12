@@ -1,12 +1,13 @@
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from .const import DOMAIN
+
+DOMAIN = "lackey"
 
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up Lackey Hub sensors based on a config entry."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
     
-    # Create a sensor for each feature flag our API returns
+    # Generate an independent sensor entity for each feature flag
     features = ["alarm", "weather", "cameras"]
     sensors = [LackeyFeatureSensor(coordinator, feature, entry) for feature in features]
         
@@ -23,7 +24,7 @@ class LackeyFeatureSensor(CoordinatorEntity, SensorEntity):
         self._attr_name = f"Lackey {feature_name.capitalize()} Feature"
         self._attr_icon = "mdi:toggle-switch"
         
-        # Visually link this sensor to the Hub device we created
+        # Link this sensor cleanly inside our physical Hub device profile
         self._attr_device_info = {
             "identifiers": {(DOMAIN, entry.data["host"])},
         }
@@ -31,5 +32,6 @@ class LackeyFeatureSensor(CoordinatorEntity, SensorEntity):
     @property
     def native_value(self):
         """Return the state of the sensor."""
+        # Reads the live true/false values pulled from your JSON payload
         state = self.coordinator.data.get(self._feature_name)
         return "Enabled" if state else "Disabled"
