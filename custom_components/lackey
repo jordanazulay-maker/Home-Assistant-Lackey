@@ -1,0 +1,6 @@
+"""Constants for the Lackey Hub integration."""
+
+DOMAIN = "lackey"
+
+# We will add more constants here later (like default ports or connection settings)
+# as we build out the background authentication bridge.
