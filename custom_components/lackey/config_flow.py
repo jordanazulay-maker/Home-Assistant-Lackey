@@ -95,6 +95,9 @@ class LackeyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             )
                         else:
                             errors["base"] = "invalid_pin"
+                    elif resp.status == 401:
+                        # Catch the security timeout/incorrect PIN directly here
+                        errors["base"] = "invalid_pin"
                     else:
                         errors["base"] = "cannot_connect"
             except Exception as e:
