@@ -7,6 +7,7 @@ from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers import selector
 
 # Hardcoding the domain so we don't need a separate const.py file!
 DOMAIN = "lackey"
@@ -21,6 +22,7 @@ class LackeyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Initialize the config flow."""
         self._host = None
         self._port = None
+        self.setup_data = {}
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -84,15 +86,14 @@ class LackeyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     if resp.status == 200:
                         data = await resp.json()
                         if data.get("success"):
-                            # Success! Save the deviceToken HA can use forever
-                            return self.async_create_entry(
-                                title="Lackey Hub",
-                                data={
-                                    "host": self._host,
-                                    "port": self._port,
-                                    "token": data.get("deviceToken")
-                                }
-                            )
+                            # Success! Save the deviceToken and connection details to memory
+                            self.setup_data = {
+                                "host": self._host,
+                                "port": self._port,
+                                "token": data.get("deviceToken")
+                            }
+                            # Transition to the entity selection screen
+                            return await self.async_step_entities()
                         else:
                             errors["base"] = "invalid_pin"
                     elif resp.status == 401:
@@ -112,4 +113,33 @@ class LackeyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             }),
             errors=errors,
             description_placeholders={"name": "Lackey Hub"}
+        )
+
+    async def async_step_entities(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Second step: Let the user select their entities."""
+        if user_input is not None:
+            # Combine the pairing data with these entity selections
+            self.setup_data.update(user_input)
+            
+            # Now we officially create the integration!
+            return self.async_create_entry(title="Lackey Hub", data=self.setup_data)
+
+        # Build the dynamic UI dropdowns
+        data_schema = vol.Schema({
+            vol.Required("alarm_entity"): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="alarm_control_panel")
+            ),
+            vol.Required("weather_entity"): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="weather")
+            ),
+            vol.Optional("door_sensors", default=[]): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="binary_sensor", multiple=True)
+            ),
+        })
+
+        return self.async_show_form(
+            step_id="entities", 
+            data_schema=data_schema
         )
