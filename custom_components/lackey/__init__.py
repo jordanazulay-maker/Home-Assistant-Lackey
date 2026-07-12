@@ -8,29 +8,29 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 DOMAIN = "lackey"
 _LOGGER = logging.getLogger(__name__)
 
-# The exact entities the Hub needs to know about
-TRACKED_ENTITIES = [
-    "alarm_control_panel.alarmo",
-    "weather.home",
-    "binary_sensor.front_door_door",
-    "binary_sensor.back_door_door",
-    "binary_sensor.contact_sensor_door",
-    "binary_sensor.contact_sensor_door_2",
-    "binary_sensor.main_guest_door",
-    "binary_sensor.french_door_door",
-    "binary_sensor.french_ii_door",
-    "binary_sensor.guest_room_door"
-]
-
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Lackey Hub from a config entry."""
     hass.data.setdefault(DOMAIN, {})
     
-    # Grab the saved connection details from the config flow pairing
+    # Grab the saved connection details and token
     host = entry.data["host"]
     port = entry.data["port"]
     token = entry.data["token"]
     
+    # Gather the user's custom entity selections from the config flow UI
+    alarm_entity = entry.data.get("alarm_entity")
+    weather_entity = entry.data.get("weather_entity")
+    door_sensors = entry.data.get("door_sensors", [])
+    
+    # Combine them into a single master list to monitor
+    tracked_entities = []
+    if alarm_entity:
+        tracked_entities.append(alarm_entity)
+    if weather_entity:
+        tracked_entities.append(weather_entity)
+    if door_sensors:
+        tracked_entities.extend(door_sensors)
+        
     session = async_get_clientsession(hass)
     hub_url = f"https://{host}:{port}/api/ha/state_update"
 
@@ -58,12 +58,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         except Exception as e:
             _LOGGER.error("Failed to push state to Lackey Hub: %s", e)
 
-    # Attach the listener to Home Assistant's event bus
+    # Attach the listener to only watch the user's custom selected entities
     unsub = async_track_state_change_event(
-        hass, TRACKED_ENTITIES, async_state_changed_listener
+        hass, tracked_entities, async_state_changed_listener
     )
     
-    # Tie the listener's lifespan to the integration so it cleans up if uninstalled
+    # Tie the listener's lifespan to the integration
     entry.async_on_unload(unsub)
     
     hass.data[DOMAIN][entry.entry_id] = {"unsub": unsub}
