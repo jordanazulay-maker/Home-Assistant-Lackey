@@ -27,8 +27,28 @@ class LackeyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Handle the step when a user manually clicks 'Add Integration'."""
-        # For now, we only support discovering the hub automatically via mDNS
-        return self.async_abort(reason="not_supported")
+        errors = {}
+        
+        if user_input is not None:
+            self._host = user_input["host"]
+            self._port = user_input["port"]
+            
+            # Prevent duplicates
+            await self.async_set_unique_id(self._host)
+            self._abort_if_unique_id_configured()
+            
+            # Jump directly to the PIN pairing screen
+            return await self.async_step_pair()
+
+        # Show a form asking for IP and Port
+        return self.async_show_form(
+            step_id="user",
+            data_schema=vol.Schema({
+                vol.Required("host", default="192.168.68.53"): str,
+                vol.Required("port", default=41921): int,
+            }),
+            errors=errors
+        )
 
     async def async_step_zeroconf(
         self, discovery_info: ZeroconfServiceInfo
