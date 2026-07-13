@@ -119,7 +119,6 @@ class LackeyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self.setup_data.update(user_input)
             return self.async_create_entry(title="Lackey Hub", data=self.setup_data)
 
-        # Removed the empty default=[] so HA doesn't crash on validation
         data_schema = vol.Schema({
             vol.Required("alarm_entity"): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="alarm_control_panel")
@@ -141,9 +140,7 @@ class LackeyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class LackeyOptionsFlowHandler(config_entries.OptionsFlow):
     """Handle options reconfiguration for Lackey Hub."""
 
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        """Initialize options flow."""
-        self.config_entry = config_entry
+    # Note: __init__ removed entirely to let the HA base class handle config_entry safely.
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -154,7 +151,7 @@ class LackeyOptionsFlowHandler(config_entries.OptionsFlow):
 
         options_schema = {}
 
-        # Safely pull existing values. If they don't exist or are empty, don't set a default.
+        # Safely pull existing values from self.config_entry via base class property
         current_alarm = self.config_entry.options.get("alarm_entity", self.config_entry.data.get("alarm_entity"))
         if current_alarm:
             options_schema[vol.Required("alarm_entity", default=current_alarm)] = selector.EntitySelector(
