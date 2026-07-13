@@ -12,17 +12,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Lackey Hub from a config entry."""
     hass.data.setdefault(DOMAIN, {})
     
-    # Grab the saved connection details and token
+    # Setup initial tracking
+    await async_setup_tracking(hass, entry)
+    
+    # Tie the update listener to the integration's option updates
+    entry.async_on_unload(entry.add_update_listener(async_update_options_listener))
+    
+    return True
+
+async def async_setup_tracking(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Set up or rebuild the state tracking listener based on data and options."""
+    # If a previous listener exists, clean it up before building the new one
+    if entry.entry_id in hass.data[DOMAIN] and "unsub" in hass.data[DOMAIN][entry.entry_id]:
+        hass.data[DOMAIN][entry.entry_id]["unsub"]()
+        _LOGGER.debug("Cleaned up old Lackey Hub state listener.")
+
     host = entry.data["host"]
     port = entry.data["port"]
     token = entry.data["token"]
     
-    # Gather the user's custom entity selections from the config flow UI
-    alarm_entity = entry.data.get("alarm_entity")
-    weather_entity = entry.data.get("weather_entity")
-    door_sensors = entry.data.get("door_sensors", [])
+    # Check entry.options first (from options flow), fall back to entry.data (initial setup)
+    alarm_entity = entry.options.get("alarm_entity", entry.data.get("alarm_entity"))
+    weather_entity = entry.options.get("weather_entity", entry.data.get("weather_entity"))
+    door_sensors = entry.options.get("door_sensors", entry.data.get("door_sensors", []))
     
-    # Combine them into a single master list to monitor
     tracked_entities = []
     if alarm_entity:
         tracked_entities.append(alarm_entity)
@@ -58,20 +71,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         except Exception as e:
             _LOGGER.error("Failed to push state to Lackey Hub: %s", e)
 
-    # Attach the listener to only watch the user's custom selected entities
+    # Attach the listener to only watch the updated list of entities
     unsub = async_track_state_change_event(
         hass, tracked_entities, async_state_changed_listener
     )
     
-    # Tie the listener's lifespan to the integration
-    entry.async_on_unload(unsub)
-    
     hass.data[DOMAIN][entry.entry_id] = {"unsub": unsub}
-    
-    return True
+    _LOGGER.info("Lackey Hub is tracking %d entities", len(tracked_entities))
+
+async def async_update_options_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Handle options flow update by rebuilding the event tracking."""
+    _LOGGER.info("Lackey Hub entity options updated. Rebuilding state tracking...")
+    await async_setup_tracking(hass, entry)
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     if entry.entry_id in hass.data[DOMAIN]:
+        # Unsubscribe the live event listener if it exists
+        if "unsub" in hass.data[DOMAIN][entry.entry_id]:
+            hass.data[DOMAIN][entry.entry_id]["unsub"]()
         hass.data[DOMAIN].pop(entry.entry_id)
     return True
