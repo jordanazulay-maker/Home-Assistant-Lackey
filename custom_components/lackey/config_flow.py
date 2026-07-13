@@ -4,6 +4,7 @@ from typing import Any
 import voluptuous as vol
 
 from homeassistant import config_entries
+from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -23,6 +24,14 @@ class LackeyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._host = None
         self._port = None
         self.setup_data = {}
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> config_entries.OptionsFlow:
+        """Create the options flow handler for reconfiguration."""
+        return LackeyOptionsFlowHandler(config_entry)
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -143,3 +152,43 @@ class LackeyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="entities", 
             data_schema=data_schema
         )
+
+
+class LackeyOptionsFlowHandler(config_entries.OptionsFlow):
+    """Handle options reconfiguration for Lackey Hub."""
+
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        """Initialize options flow."""
+        self.config_entry = config_entry
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Manage the configuration options."""
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        # Grab current values from combined data/options to serve as defaults
+        current_alarm = self.config_entry.options.get(
+            "alarm_entity", self.config_entry.data.get("alarm_entity", "")
+        )
+        current_weather = self.config_entry.options.get(
+            "weather_entity", self.config_entry.data.get("weather_entity", "")
+        )
+        current_doors = self.config_entry.options.get(
+            "door_sensors", self.config_entry.data.get("door_sensors", [])
+        )
+
+        options_schema = vol.Schema({
+            vol.Required("alarm_entity", default=current_alarm): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="alarm_control_panel")
+            ),
+            vol.Required("weather_entity", default=current_weather): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="weather")
+            ),
+            vol.Optional("door_sensors", default=current_doors): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="binary_sensor", multiple=True)
+            ),
+        })
+
+        return self.async_show_form(step_id="init", data_schema=options_schema)
