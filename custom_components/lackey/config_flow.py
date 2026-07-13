@@ -30,7 +30,8 @@ class LackeyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         config_entry: config_entries.ConfigEntry,
     ) -> config_entries.OptionsFlow:
         """Create the options flow handler for reconfiguration."""
-        return LackeyOptionsFlowHandler(config_entry)
+        # Fixed: Instantiating the handler with no arguments
+        return LackeyOptionsFlowHandler()
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -139,8 +140,6 @@ class LackeyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 class LackeyOptionsFlowHandler(config_entries.OptionsFlow):
     """Handle options reconfiguration for Lackey Hub."""
-
-    # Note: __init__ removed entirely to let the HA base class handle config_entry safely.
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
