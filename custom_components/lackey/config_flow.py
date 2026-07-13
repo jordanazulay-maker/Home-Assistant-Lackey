@@ -135,16 +135,16 @@ class LackeyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             # Now we officially create the integration!
             return self.async_create_entry(title="Lackey Hub", data=self.setup_data)
 
-        # Build the dynamic UI dropdowns
+        # Build the dynamic UI dropdowns (Weather removed, Lights added)
         data_schema = vol.Schema({
             vol.Required("alarm_entity"): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="alarm_control_panel")
             ),
-            vol.Required("weather_entity"): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="weather")
-            ),
             vol.Optional("door_sensors", default=[]): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="binary_sensor", multiple=True)
+            ),
+            vol.Optional("lights", default=[]): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain=["light", "switch"], multiple=True)
             ),
         })
 
@@ -168,22 +168,22 @@ class LackeyOptionsFlowHandler(config_entries.OptionsFlow):
         current_alarm = self.config_entry.options.get(
             "alarm_entity", self.config_entry.data.get("alarm_entity", "")
         )
-        current_weather = self.config_entry.options.get(
-            "weather_entity", self.config_entry.data.get("weather_entity", "")
-        )
         current_doors = self.config_entry.options.get(
             "door_sensors", self.config_entry.data.get("door_sensors", [])
+        )
+        current_lights = self.config_entry.options.get(
+            "lights", self.config_entry.data.get("lights", [])
         )
 
         options_schema = vol.Schema({
             vol.Required("alarm_entity", default=current_alarm): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="alarm_control_panel")
             ),
-            vol.Required("weather_entity", default=current_weather): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="weather")
-            ),
             vol.Optional("door_sensors", default=current_doors): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="binary_sensor", multiple=True)
+            ),
+            vol.Optional("lights", default=current_lights): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain=["light", "switch"], multiple=True)
             ),
         })
 
