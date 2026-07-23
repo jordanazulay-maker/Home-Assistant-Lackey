@@ -57,11 +57,11 @@ async def async_sync_entities_to_hub(hass: HomeAssistant, entry: ConfigEntry):
     }
     
     try:
-        # Use HA's safe client session wrapper
-        session = async_get_clientsession(hass)
+        # Ask HA for a session that explicitly ignores SSL verification
+        session = async_get_clientsession(hass, verify_ssl=False)
         
-        # ssl=False is required to trust your local hub's self-signed certificate
-        async with session.post(url, json=payload, headers=headers, ssl=False) as resp:
+        # Now fire the payload!
+        async with session.post(url, json=payload, headers=headers) as resp:
             if resp.status == 200:
                 _LOGGER.info("Successfully synced HA configuration to Lackey Hub!")
             else:
